@@ -1,0 +1,166 @@
+graph TB
+    subgraph NETWORK_ARCHITECTURE["Architecture Réseau"]
+        subgraph INTERNET["Internet"]
+            clients[Clients]
+        end
+
+        subgraph DMZ["DMZ (VLAN 10 - 192.168.10.0/24)"]
+            WAF["Web Application Firewall (192.168.10.2)"]
+            LB["Load Balancer (192.168.10.3)"]
+            REVERSE_PROXY["Reverse Proxy NGINX (192.168.10.4)"]
+            PUBLIC_WEB["Serveurs Web Publics (192.168.10.5-10)"]
+            BASTION["Bastion Host / Jump Server (192.168.10.254)"]
+        end
+        
+        subgraph EDGE_SECURITY["Sécurité Périmétrique"]
+            EXTERNAL_FW["Firewall Externe (91.134.58.190)"]
+            NGFW["Next-Gen Firewall"]
+            IDS["Système de Détection d'Intrusion (IDS/IPS)"]
+            NAT["NAT/PAT"]
+            VPN["VPN Gateway (192.168.10.254)"]
+        end
+    end
+
+    subgraph PROXMOX_HOST["Serveur Physique OVH - Proxmox VE 8 (IP Publique: 91.134.58.189)"]
+        subgraph VM101["VM101: Hébergement Mutualisé (192.168.1.101)"]
+            WEBSERVER["Serveur Web (Apache/NGINX)"]
+            PHP_FPM["PHP-FPM"]
+            MARIADB["MariaDB"]
+            CPANEL["cPanel/Plesk"]
+            CLIENT_SPACES["Espaces Clients Mutualisés"]
+        end
+
+        subgraph VM102["VM102: Proxmox VPS Clients (192.168.1.102)"]
+            NESTED_PROXMOX["Proxmox Imbriqué"]
+            subgraph TEMPLATES["Templates"]
+                TEMPLATE_PROXMOX["Template Proxmox"]
+                TEMPLATE_WINDOWS["Template Windows Server"]
+                TEMPLATE_LINUX["Template Linux Server"]
+            end
+            subgraph VPS_CLIENTS["VPS Clients"]
+                VPS1["VPS Client 1"]
+                VPS2["VPS Client 2"]
+                VPS3["VPS Client 3"]
+            end
+        end
+
+        subgraph VM103["VM103: Proxmox VIP/Spécialisé (192.168.1.103)"]
+            NESTED_PROXMOX_VIP["Proxmox Imbriqué VIP"]
+            SERVICE1["Service Spécialisé 1"]
+            SERVICE2["Service Spécialisé 2"]
+            SERVICE3["Service Spécialisé 3"]
+        end
+
+        subgraph VM104["VM104: Application Web (192.168.1.104)"]
+            FRONTEND["Frontend React"]
+            BACKEND["Backend Spring Boot"]
+            API_GATEWAY["API Gateway"]
+            APP_DB["Base de Données Application"]
+            ORDER_SYSTEM["Système de Commande"]
+            VOUCHER_SYSTEM["Gestion des Bons d'Achat"]
+        end
+
+        subgraph VM105["VM105: Monitoring & Sécurité (192.168.1.105)"]
+            PROMETHEUS["Prometheus"]
+            GRAFANA["Grafana"]
+            ZABBIX["Zabbix"]
+            ELASTIC["ELK Stack"]
+            FAIL2BAN["Fail2Ban"]
+            ANSIBLE["Ansible"]
+            JENKINS["Jenkins CI/CD"]
+            VAULT["HashiCorp Vault"]
+            AUTOMATION["Orchestrateur d'Automatisation"]
+        end
+
+        subgraph PROVISIONING_FLOW["Flux de Provisionnement Automatique"]
+            ORDER_RECEIPT["1. Réception de la commande"]
+            RESOURCE_CHECK["2. Vérification des ressources"]
+            TEMPLATE_SELECTION["3. Sélection du template"]
+            DEPLOYMENT["4. Déploiement de l'environnement"]
+            CONFIG["5. Configuration personnalisée"]
+            NOTIFICATION["6. Notification au client"]
+        end
+
+        subgraph INTERNAL_NETWORK["Réseaux Internes"]
+            VLAN_MANAGEMENT["VLAN Management (VLAN 20 - 192.168.20.0/24)"]
+            VLAN_STORAGE["VLAN Storage (VLAN 30 - 192.168.30.0/24)"]
+            VLAN_BACKUP["VLAN Backup (VLAN 40 - 192.168.40.0/24)"]
+            VLAN_CLIENT["VLAN Client (VLAN 50 - 192.168.50.0/24)"]
+            VLAN_DB["VLAN Base de Données (VLAN 60 - 192.168.60.0/24)"]
+        end
+
+        subgraph SECURITY_LAYERS["Couches de Sécurité"]
+            SSL_TLS["Certificats SSL/TLS"]
+            NETWORK_ISOLATION["Isolation Réseau"]
+            CGROUPS["Limitation Ressources (cgroups)"]
+            CHROOT["Isolation environnements (CageFS/chroot)"]
+            SELINUX["SELinux/AppArmor"]
+        end
+
+        subgraph BACKUP_SYSTEM["Système de Sauvegarde"]
+            BACKUP_SERVER["Serveur de Backup"]
+            OFFSITE_BACKUP["Backups Hors-site"]
+            SNAPSHOT["Snapshots Proxmox"]
+        end
+    end
+
+    %% Connexions entre composants
+    clients --> EXTERNAL_FW
+    EXTERNAL_FW --> WAF
+    WAF --> LB
+    LB --> REVERSE_PROXY
+    REVERSE_PROXY --> NGFW
+    NGFW --> IDS
+    EXTERNAL_FW --> VPN
+    VPN --> BASTION
+    BASTION --> PROXMOX_HOST
+
+    %% Connexions internes
+    REVERSE_PROXY --> VM104
+    IDS --> VM105
+    VM104 --> API_GATEWAY
+    API_GATEWAY --> BACKEND
+    BACKEND --> APP_DB
+    VM105 --> PROMETHEUS
+    PROMETHEUS --> GRAFANA
+    VM105 --> ANSIBLE
+    ANSIBLE --> VM101
+    ANSIBLE --> VM102
+    ANSIBLE --> VM103
+    ANSIBLE --> VM104
+
+    %% Connexions de sécurité
+    VM105 --> FAIL2BAN
+    FAIL2BAN --> PROXMOX_HOST
+    VM105 --> VAULT
+    VAULT --> JENKINS
+    JENKINS --> VM104
+
+    %% Flux de provisionnement
+    ORDER_SYSTEM --> ORDER_RECEIPT
+    ORDER_RECEIPT --> RESOURCE_CHECK
+    RESOURCE_CHECK --> TEMPLATE_SELECTION
+    TEMPLATE_SELECTION --> DEPLOYMENT
+    DEPLOYMENT --> CONFIG
+    CONFIG --> NOTIFICATION
+    
+    %% Connexions de provisionnement
+    ORDER_SYSTEM --> AUTOMATION
+    AUTOMATION --> ANSIBLE
+    ANSIBLE --> NESTED_PROXMOX
+    ANSIBLE --> CLIENT_SPACES
+    NESTED_PROXMOX --> VPS_CLIENTS
+    NOTIFICATION --> clients
+
+    %% Style pour mieux visualiser
+    classDef dmz fill:#f9f,stroke:#333,stroke-width:2px;
+    classDef vm fill:#bbf,stroke:#333,stroke-width:1px;
+    classDef security fill:#fdd,stroke:#f66,stroke-width:1px;
+    classDef network fill:#dfd,stroke:#333,stroke-width:1px;
+    classDef backup fill:#ffd,stroke:#333,stroke-width:1px;
+
+    class DMZ dmz;
+    class VM101,VM102,VM103,VM104,VM105 vm;
+    class SECURITY_LAYERS,FAIL2BAN,VAULT,IDS,NGFW,WAF security;
+    class INTERNAL_NETWORK,VLAN_MANAGEMENT,VLAN_STORAGE,VLAN_CLIENT,VLAN_BACKUP network;
+    class BACKUP_SYSTEM,BACKUP_SERVER,OFFSITE_BACKUP,SNAPSHOT backup;
